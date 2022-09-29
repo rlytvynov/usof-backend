@@ -64,7 +64,7 @@ To check this API, use Postman app. It can be used to easily send requests to th
 |Get all users|`GET - /api/users`| Nothing |Show all users|
 |Create user|`POST - /api/users`|refreshToken(admin only)|New user saved in database|
 |Update avatar|`PATCH - /api/users/avatar`|form-data -> {avatar(.png .jpg)}|User photo updated|
-|Get specified user|`GET - /api/users/:user_id`|refreshToken|Specified user displayed|
+|Get specified user|`GET - /api/users/:user_id`|Nothing|Specified user displayed|
 |Update user|`PATCH - /api/users/:user_id`|json data -> {login, email, fullName}|Confirmation sent to the new email|
 |Confirm new email|`GET - /api/users/updateActivation/:activationToken`| access token |Email updated|
 |User delete|`DELETE - /api/users`|refreshToken|User deleted|
