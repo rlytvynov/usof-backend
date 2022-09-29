@@ -1,7 +1,4 @@
 .DS_Store
 .env
 node_modules
-db.sql
-testData.sql
-tests
 .adminbro

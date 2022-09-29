@@ -28,12 +28,13 @@ const upload = multer({
     }
 })
 
-router.get ('/', usersController.getUsers)
+router.get ('/', checkAuthUser, checkAdmin, usersController.getUsers)
+router.get('/:user_id', usersController.getUser)
+router.get('/updateActivation/:activationToken', usersController.updateUserConfirmEmail)
 router.post('/', checkAuthUser, checkAdmin, usersController.createNewUser)
 router.patch('/avatar', checkAuthUser, upload.single('avatar'), usersController.uploadPhoto)
-router.get('/:user_id', checkAuthUser, usersController.getUser)
 router.patch('/:user_id', checkAuthUser, usersController.updateUser)
-router.get('/updateActivation/:activationToken', usersController.updateUserConfirmEmail)
 router.delete('/:user_id', checkAuthUser, usersController.deleteUser)
+
 
 module.exports = router
