@@ -42,7 +42,7 @@ To deploy this project run
 
 ## Using the API
 
-To check this API, Postman app. It can be used to easily send requests to the urlsdescribed below. The url type is: `http:localhost:3000/api/auth/register`. In order to send data choose `Body` tab and select `x-www-form-urlencoded` radio button and send `key=value` data
+To check this API, use Postman app. It can be used to easily send requests to the urlsdescribed below. The url type is: `http:localhost:3000/api/auth/register`. In order to send data choose `Body` tab and select `x-www-form-urlencoded` radio button and send `key=value` data
 
 #### Here's list of possible user API requests
 
