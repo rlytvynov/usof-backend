@@ -31,8 +31,8 @@ const commentController = {
 
     createLikeToComment: async (req, res) => {
         try {
-            const post = await Comments.findOne({where: {id: req.params.comment_id}})
-            if(!post) {
+            const comment = await Comments.findOne({where: {id: req.params.comment_id}})
+            if(!comment) {
                 return res.status(500).json({msg: "Such comment does not exist"})
             } else {
                 const like = await Like.findOne({where: {commentID: req.params.comment_id, userID: req.user.id}})

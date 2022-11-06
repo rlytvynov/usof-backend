@@ -10,14 +10,15 @@ let transporter = nodemailer.createTransport({
     }
 })
 
-const mailer = mailOptions => {
-    transporter.sendMail(mailOptions, (err, info) => {
-        if(err){
-            return console.log(err)
-        } else {
-            console.log("Send mail: ", info)
-        }
-    })
+const mailer = async mailOptions => {
+    try {
+        const response = await transporter.sendMail(mailOptions);
+        console.log('Message sent: %s', response);
+              
+      } catch (error) {
+        console.log('error =' + error);
+        throw Error("Network Connection");
+      }
 }
 
 module.exports = mailer

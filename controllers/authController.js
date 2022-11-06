@@ -34,10 +34,17 @@ const authController = {
                 from: process.env.EMAIL_USER,
                 to: email,
                 subject: 'Confirm email',
-                text: `http://localhost:${process.env.APP_PORT}/api/auth/activation/${activationToken}`
+                text: `http://localhost:3000/activation/${activationToken}`
             }
-            mailer(mailOptions)
-            res.status(200).json({msg: "Register Success! Please activate your email."})
+            try{
+                await mailer(mailOptions)
+            } finally {
+
+            }
+            res.status(200).json({
+                msg: "Register Success! Please activate your email to log in.",
+                activationToken
+            })
         } catch(err) {
             res.status(500).json({msg: err.message})
         }
@@ -73,34 +80,110 @@ const authController = {
 
     login: async function(req, res) {
         try {
-            const {login, password, email} = req.body
-            let candidate = undefined
-
-            if(login) {
-                candidate = await User.findOne({where: {login: login}})
-            } 
-            if(email){
-                candidate = await User.findOne({where: {email: email}})
-            }
-
+            const {email, password} = req.body
+            let candidate = await User.findOne({where: {email: email}})
 
             if(candidate) {
                 let passwordResult = bcrypt.compareSync(password, candidate.password) 
                 if(passwordResult) {
-                    const refreshToken = generateRefreshToken({id: candidate.id, role: candidate.role})
+                    const refreshToken = generateRefreshToken({
+                        id: candidate.id,
+                        login: candidate.login,
+                        profilePicture: candidate.profilePicture,
+                        fullName: candidate.fullName,
+                        rating: candidate.rating,
+                        role: candidate.role
+                    })
+                    const accessToken = generateAccessToken({
+                        id: candidate.id,
+                        login: candidate.login,
+                        profilePicture: candidate.profilePicture,
+                        fullName: candidate.fullName,
+                        rating: candidate.rating,
+                        role: candidate.role
+                    })
                     //console.log(refreshToken)
                     res.clearCookie('connect.sid');
                     res.cookie('refreshToken', refreshToken, {
                         httpOnly: true, //protect from XSS(malicious client side script )
                         maxAge: 7*24*60*60*1000
                     })
-                    return res.status(200).json({msg: `Hi, ${candidate.login}`})
+                    return res.status(200).json({
+                        id: candidate.id,
+                        login: candidate.login,
+                        profilePicture: candidate.profilePicture,
+                        fullName: candidate.fullName,
+                        rating: candidate.rating,
+                        role: candidate.role,
+                        accessToken
+                    })
                 } else {
                     return res.status(401).json({msg: 'Password is not correct'})
                 }
             } 
             else {
                 return res.status(404).json({msg: "This user doesn't registered or unauthorized"})
+            }
+        } catch (error) {
+            return res.status(500).json({msg: error.message})
+        }
+    },
+
+    me: async function (req, res) {
+        try {
+            if(req.user) {
+                const user = await User.findOne({where: {id: req.user.id}})
+                if (user) {
+                    return res.status(200).json({
+                        id: user.id,
+                        login: user.login,
+                        profilePicture: user.profilePicture,
+                        fullName: user.fullName,
+                        rating: user.rating,
+                        role: user.role,
+                    })
+                } else {
+                    return res.status(406).json({ message: 'Unauthorized' });
+                }
+            } else {
+                if (req.cookies?.refreshToken) {
+                    console.log('hello')
+
+                    // Destructuring refreshToken from cookie
+                    const refreshToken = req.cookies.refreshToken;
+            
+                    // Verifying refresh token
+                    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, 
+                    (err, user) => {
+                        if (err) {
+            
+                            // Wrong Refesh Token
+                            return res.status(406).json({ message: 'Unauthorized' });
+                        }
+                        else {
+                            // Correct token we send a new access token
+                            const accessToken = generateAccessToken({
+                                id: user.id,
+                                login: user.login,
+                                profilePicture: user.profilePicture,
+                                fullName: user.fullName,
+                                rating: user.rating,
+                                role: user.role
+                            })
+                            return res.status(200).json({ 
+                                id: user.id,
+                                login: user.login,
+                                profilePicture: user.profilePicture,
+                                fullName: user.fullName,
+                                rating: user.rating,
+                                role: user.role,
+                                accessToken
+                             });
+                        }
+                    })
+                } else {
+                    return res.status(406).json({ message: 'Unauthorized' });
+                }
             }
         } catch (error) {
             return res.status(500).json({msg: error.message})

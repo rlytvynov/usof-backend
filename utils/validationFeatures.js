@@ -10,11 +10,11 @@ function generateActivationToken(user) {
 }
 
 const generateAccessToken = (user) => {
-    return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '1h'})
+    return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '15m'})
 }
 
 const generateRefreshToken = (user) => {
-    return jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, {expiresIn: '168h'})
+    return jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, {expiresIn: '672h'})
 }
 
 module.exports = {validateEmail, generateActivationToken, generateAccessToken, generateRefreshToken}

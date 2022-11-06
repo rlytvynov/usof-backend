@@ -21,7 +21,7 @@ https://dev.mysql.com/downloads/mysql/
 To run this project, you will need to add the following environment variables to your `.env` file
 
 `APP_PORT`
-`HOST`
+`APP_HOST`
 `DB_HOST`
 `DB_USER`
 `DB_PASS`

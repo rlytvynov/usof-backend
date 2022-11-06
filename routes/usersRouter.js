@@ -28,7 +28,7 @@ const upload = multer({
     }
 })
 
-router.get ('/', checkAuthUser, checkAdmin, usersController.getUsers)
+router.get ('/', usersController.getUsers)
 router.get('/:user_id', usersController.getUser)
 router.get('/updateActivation/:activationToken', usersController.updateUserConfirmEmail)
 router.post('/', checkAuthUser, checkAdmin, usersController.createNewUser)

@@ -13,6 +13,7 @@ const usersController = {
             users.forEach(element => {
                 newUsers.push({
                     id: element.id, 
+                    login: element.login,
                     email: element.email,
                     fullName: element.fullName,
                     profilePicture: element.profilePicture,
@@ -100,27 +101,30 @@ const usersController = {
             if(req.user.id != req.params.user_id) {
                 return res.status(400).json({msg: `You can't update other users)`})
             } else {
-                const {fullName, login, email} = req.body
-
-                if(!validateEmail(email)) {
-                    return res.status(400).json({msg: "Invalid email."})
+                const {fullName, login, email, password} = req.body
+                let anotherUserWithEmail = null, anotherUserWithLogin = null
+                if (email) {
+                    anotherUserWithEmail = await User.findOne({where: {email: email}})
                 }
-
-                const anotherUserWithEmail = await User.findOne({where: {email: email}})
-                const anotherUserWithLogin = await User.findOne({where: {login: login}})
+    
+                if(login) {
+                    anotherUserWithLogin = await User.findOne({where: {login: login}})
+                }
 
                 if(anotherUserWithEmail && anotherUserWithEmail.id!=req.user.id ||
                     anotherUserWithLogin && anotherUserWithLogin.id!=req.user.id) {
                         return res.status(400).json({ msg: 'User with such login or email is already exists'})
                 }
 
+
                 const userData = await User.findOne({where: {id: req.user.id}})
                 let newUser = {}
-                if(email == userData.email) {
+                if(email == userData.email || !email) {
                     newUser = {id: req.user.id, login, fullName}
                     await User.update({
                         fullName: fullName ? newUser.fullName : userData.fullName,
-                        login: login ? newUser.login : userData.login
+                        login: login ? newUser.login : userData.login,
+                        password: password ? await bcrypt.hash(password, 12) : userData.password
                     }, {where: {id: newUser.id}})
                     return res.status(200).json({msg: 'User was updated'})
                 } else {
@@ -130,7 +134,7 @@ const usersController = {
                         from: process.env.EMAIL_USER,
                         to: email,
                         subject: 'Confirm email',
-                        text: `http://${process.env.HOST}:${process.env.APP_PORT}/api/users/updateActivation/${activationToken}`
+                        text: `http://${process.env.APP_HOST}:${process.env.APP_PORT}/api/users/updateActivation/${activationToken}`
                     }
                     mailer(mailOptions)
                     return res.status(200).json({msg: 'Activate your new email.'})
@@ -143,6 +147,7 @@ const usersController = {
 
     uploadPhoto: async (req, res) => {
         try {
+            console.log(req.file)
             if(req.file) {
                 const user = await User.findOne({
                     where: {id: req.user.id}
@@ -151,7 +156,7 @@ const usersController = {
                     return res.status(404).json({msg: "Authorize please"})
                 //console.log(req.file.filename + ' hello')
                 await user.update({
-                    profilePicture: `http://localhost:5000/${req.file.filename}`
+                    profilePicture: `http://localhost:8000/${req.file.filename}`
                 })
                 return res.status(200).json({msg: "Avatar updated"})
             } else

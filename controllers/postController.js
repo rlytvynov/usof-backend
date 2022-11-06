@@ -43,21 +43,12 @@ const postController = {
                         }
                     }
                 } 
-            }
-
-            if(queryData.from || queryData.to) {
-                //console.log(finalArray)
-                for (let i = 0; i < posts.length; i++) {
-                    if(new Date(posts[i].dataValues.publishDate) < new Date(queryData.from * 1000) ||
-                        new Date(posts[i].dataValues.publishDate) > new Date(queryData.to) * 1000) {
-                            posts[i] = {}
-                        }
-                }    
+                posts = posts.filter(element => Object.keys(element).length !== 0) 
             }
 
             if(queryData.category) {
                 for (let i = 0; i < posts.length; i++) {
-                    const categories = await Post.findAll({
+                    const categories = (await Post.findAll({
                         where: {id: posts[i].dataValues.id},
                         attributes: ['title'],
                         include: [{
@@ -65,37 +56,83 @@ const postController = {
                             as: "categories",
                             through: PostCategory
                         }]
-                    })
-                    //console.log(queryData.category)
+                    }))[0].categories.map(item => item.dataValues.title)
+                    console.log(posts[i])
+                    console.log(categories)
+
+                    if(!findCommonElement(queryData.category, categories)) {
+                        posts[i] = {}
+                    } 
                     //console.log('-------------------------------')
-                    for (let j = 0; j < categories[0].categories.length; j++) {
-                        if(!(queryData.category.includes(categories[0].categories[j].dataValues.title)) && j+1 === categories[0].categories.length ) {
-                            //console.log(categories[0].categories[j].dataValues.title)
+                    // for (let j = 0; j < categories[0].categories.length; j++) {
+                    //     if(queryData.category.includes(categories[0].categories[j].dataValues.title)) {
+                    //         posts[i] = {}
+                    //     } else {
+                    //         break
+                    //     }
+                    // }
+                }  
+                posts = posts.filter(element => Object.keys(element).length !== 0)         
+            }
+
+            if(queryData.from || queryData.to) {
+                console.log(posts)
+                for (let i = 0; i < posts.length; i++) {
+                    if(new Date(posts[i].dataValues.publishDate) < new Date(queryData.from) ||
+                        new Date(posts[i].dataValues.publishDate) > new Date(queryData.to)) {
                             posts[i] = {}
                         }
-                    }
-                }          
+                }  
             }
 
             posts = posts.filter(element => Object.keys(element).length !== 0) 
-            if(req.user.role === 'admin') {
-                return res.status(200).json(paginate(posts, 4, queryData.page ? queryData.page : 1))
-            } else { 
-                return res.status(200).json(paginate(getPostsForUser(req, posts), 4, queryData.page ? queryData.page : 1))
+
+            for (const element of posts) {
+                element.dataValues.comments = (await Comments.findAll({where: {postID: element.id}})).length
+            }
+
+            const postsPerPage = 4
+            if(!req.user || req.user.role !== 'admin') {
+                return res.status(200).json(paginate(getPostsForUser(req, posts), postsPerPage, queryData.page ? Number(queryData.page) : 1))
+            } else {
+                return res.status(200).json(paginate(posts, postsPerPage, queryData.page ? Number(queryData.page) : 1))
             }
         } catch (error) {
             return res.status(500).json({msg: error.message})
         }
     },
+    getAllPostsWithoutPagination : async (req, res) => {
+        try {
+            const posts = await Post.findAll()
+            for (const element of posts) {
+                element.dataValues.comments = (await Comments.findAll({where: {postID: element.id}})).length
+            }
+            return res.status(200).json(posts)
+        } catch (error) {
+            return res.status(500).json({msg: error.message})
+        }
+    }, 
 
     getPostById: async (req, res ) => {
         try {
             const postID = req.params.post_id
-            const post = await Post.findOne({where: {id: postID, status: 'active'}})
+            console.log('-------------------------------------')
+            const post = (!req.user || req.user.role === 'user')? await Post.findOne({where: {id: postID, status: 'active'}}) : await Post.findOne({where: {id: postID}})
             if(post) {
-                return res.status(200).json(post)
+                const like = await Like.findOne({where: {userID: req.user? req.user.id : 0, postID: post.id}})
+                return res.status(200).json({
+                    id: post.id,
+                    title: post.title,
+                    author: (await User.findOne({where: {id: post.userID}})).login,
+                    authorPhoto: (await User.findOne({where: {id: post.userID}})).profilePicture, 
+                    date: post.publishDate,
+                    content: post.content,
+                    like: like ? like.dataValues.type : undefined,
+                    status: post.status,
+                    rating : post.rating
+                })
             } else {
-                return res.status(500).json({msg: "There isn't such post"})
+                return res.status(404).json({msg: "Not Found"})
             }
         } catch (error) {
             return res.status(500).json({msg: error.message})
@@ -104,14 +141,11 @@ const postController = {
 
     createNewPost: async (req, res) => {
         try {
-            // userID INT NOT NULL,
-            // title VARCHAR(128),
-            // publishDate DATE NOT NULL,
-            // content TEXT NOT NULL,
-            // rating INT NOT NULL DEFAULT 0,
-            const {title, content, categories} = req.body
 
-            if(title && content && categories) {
+            const {title, content, categories} = req.body
+            console.log(categories)
+
+            if(title && content && categories.length) {
                 const post = await Post.create({
                     userID: req.user.id,
                     title: title,
@@ -119,9 +153,9 @@ const postController = {
                     content: content,
                     status: 'active'
                 })
-                for (const categoryID of categories.slice(1, categories.length - 1).split(',')) {
+                for (const categoryTitle of categories) {
                     const category = await Category.findOne({
-                        where: { id: categoryID }
+                        where: { title: categoryTitle }
                     })
                     console.log(category)
                     if(category) {
@@ -146,15 +180,28 @@ const postController = {
     getCommentsByPostId: async (req, res) => {
         try {
             const postID = req.params.post_id
-            const post = req.user.role === 'admin'? await Post.findOne({where: {id: postID}}) : await Post.findOne({where: {id: postID, status: 'active'}})
+            const post = (!req.user || req.user.role === 'user')? await Post.findOne({where: {id: postID, status: 'active'}}) : await Post.findOne({where: {id: postID}})
             if(post){
                 const comments = await Comments.findAll({where: {postID: postID}})
                 if(!comments.length) {
-                    return res.status(500).json({msg: "There is not comments yet"})
+                    return res.status(404).json({msg: "Not Found"})
                 }
-                return res.status(200).json(comments)
+                let commentModificated = []
+                for (const comment of comments) {
+                    const like = await Like.findOne({where: {userID: req.user? req.user.id : 0, commentID: comment.id}})
+                    let newComment = {
+                        id: comment.id,
+                        publishDate: comment.publishDate,
+                        content: comment.content,
+                        author: (await User.findOne({where: {id: comment.userID}})).login,
+                        authorPhoto:(await User.findOne({where: {id: comment.userID}})).profilePicture,
+                        like: like ? like.dataValues.type : undefined
+                    }
+                    commentModificated.push(newComment)
+                }
+                return res.status(200).json(commentModificated)
             } else {
-                return res.status(500).json({msg: "There is not such post"})
+                return res.status(404).json({msg: "Not Found"})
             }
         } catch (error) {
             return res.status(500).json({msg: error.message})
@@ -382,17 +429,46 @@ const postController = {
 }
 
 function paginate(array, page_size, page_number) {
-    return array.slice((page_number - 1) * page_size, page_number * page_size);
+    return {
+        totalItems: array.length,
+        itemsCountPerPage: page_size,
+        totalPages: Math.ceil(array.length / page_size),
+        currentPage: page_number,
+        posts: array.slice((page_number - 1) * page_size, page_number * page_size)
+    }
 }
 
 function getPostsForUser(req, posts) {
     for (let i = 0; i < posts.length; i++) {
-        if(posts[i].dataValues.status === 'locked' && posts[i].dataValues.userID !== req.user.id){
+        if(posts[i].dataValues.status === 'locked' && (!req.user || posts[i].dataValues.userID !== req.user.id)){
             posts[i] = {}
         }
     }
     posts = posts.filter(element => Object.keys(element).length !== 0) 
     return posts
+}
+
+function findCommonElement(array1, array2) {
+     
+    // Loop for array1
+    for(let i = 0; i < array1.length; i++) {
+         
+        // Loop for array2
+        for(let j = 0; j < array2.length; j++) {
+             
+            // Compare the element of each and
+            // every element from both of the
+            // arrays
+            if(array1[i] === array2[j]) {
+             
+                // Return if common element found
+                return true;
+            }
+        }
+    }
+     
+    // Return if no common element exist
+    return false;
 }
 
 module.exports = postController
